@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: rootpass
+          MYSQL_DATABASE: loganalyzer
+          MYSQL_USER: loguser
+          MYSQL_PASSWORD: logpass
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -prootpass"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Встановлення залежностей
+        run: pip install -r requirements-dev.txt
+
+      - name: Створення тестової бази
+        run: |
+          mysql -h 127.0.0.1 -uroot -prootpass -e "CREATE DATABASE IF NOT EXISTS loganalyzer_test CHARACTER SET utf8mb4; GRANT ALL ON loganalyzer_test.* TO 'loguser'@'%';"
+
+      - name: Ruff
+        run: python -m ruff check .
+
+      - name: Mypy
+        run: python -m mypy loganalyzer
+
+      - name: Міграції на порожній базі
+        run: python -m alembic upgrade head
+
+      - name: Тести з покриттям
+        run: python -m pytest --cov=loganalyzer --cov-report=term-missing --cov-fail-under=80
