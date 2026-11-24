@@ -13,6 +13,26 @@ services:
       - "3306:3306"
     volumes:
       - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpass"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    container_name: loganalyzer-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: mysql+pymysql://loguser:logpass@db:3306/loganalyzer?charset=utf8mb4
+      SECRET_KEY: change-this-secret-in-real-life-0123456789
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/logs:ro
 
 volumes:
   db_data:
